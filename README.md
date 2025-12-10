@@ -8,18 +8,14 @@ This implementation includes:
 ✓ Dynamic operator scheduling (Mutation Scheduler)  
 ✓ Dependent-field recomputation (length, CRC, checksums, etc.)  
 ✓ Crash detection via windowed binary search (CrashFilter)  
-✓ Seed corpus management & automatic promotion  
 ✓ UDP and Serial device interfaces  
-✓ Protocol-specific plugins (MAVLink v2, DUML, BLE-ATT)  
-✓ Dummy device for simulation without real hardware  
-
 ---
 
-# 📦 Installation
+# Installation
 
 ```bash
-git clone https://github.com/your/repo.git
-cd repo
+git clone https://github.com/JiHyeonYu/CR-Fuzz.git
+cd CR-Fuzz
 pip install -r requirements.txt
 ```
 
@@ -31,7 +27,7 @@ pip install pyserial
 
 ---
 
-# 📁 Normal Packet Log (Required)
+# Normal Packet Log (Required)
 
 CR-Fuzz requires a log file containing normal, valid packets.  
 This baseline is used for PSI analysis and seed corpus initialization.
@@ -52,12 +48,12 @@ Supported formats:
 
 ---
 
-# 🔧 CLI Parameters
+# CLI Parameters
 
 Run:
 
 ```bash
-python cr_fuzz2.py --help
+python CR-Fuzz.py --help
 ```
 
 ## Basic Options
@@ -83,8 +79,6 @@ python cr_fuzz2.py --help
 | `--udp-local-ip IP` | Local bind IP | `0.0.0.0` |
 | `--udp-local-port PORT` | Local bind port | `0` |
 
-*Commonly used for PX4 SITL, MAVLink ground stations, etc.*
-
 ---
 
 ## Serial Options
@@ -96,16 +90,16 @@ python cr_fuzz2.py --help
 | `--serial-read-timeout` | Read timeout | `0.1` |
 | `--serial-liveness-timeout` | Liveness check timeout | `5.0` |
 
-*Useful for real hardware such as 3DR Solo, Pixhawk autopilots, IoT devices using UART, etc.*
+*Useful for real hardware such as 3DR Solo, IoT devices using UART, etc.*
 
 ---
 
-# ▶️ Usage Examples
+# Usage Examples
 
-## 1. Fuzzing PX4 SITL via UDP
+## 1. Fuzzing via UDP
 
 ```bash
-python cr_fuzz2.py \
+python CR_Fuzz.py \
   --mode udp \
   --udp-ip 127.0.0.1 \
   --udp-port 14550 \
@@ -116,7 +110,7 @@ python cr_fuzz2.py \
 
 ---
 
-## 2. Fuzzing a MAVLink-capable drone via Serial
+## 2. Fuzzing via Serial Port
 
 ```bash
 python cr_fuzz2.py \
@@ -129,25 +123,17 @@ python cr_fuzz2.py \
 
 ---
 
-## 3. Logic-only dry run (no device required)
-
-```bash
-python cr_fuzz2.py --dry-run
-```
-
----
-
-## 4. Using the Dummy Device Simulator
+## 3. Using the Dummy Device Simulator
 
 The framework includes a full-featured dummy device with adjustable crash patterns, noise injection, and new-response simulation.
 
 ```python
-from cr_fuzz2 import DummyDeviceInterface, DummyDeviceScenario
+from CR_fuzz.py import DummyDeviceInterface, DummyDeviceScenario
 ```
 
 ---
 
-# 🧠 Architecture
+# Architecture
 
 CR-Fuzz internally performs the following steps:
 
@@ -158,9 +144,9 @@ CR-Fuzz internally performs the following steps:
    - Specific fields  
    - Mutable fields  
    - Dependent fields  
-4. Initialize mutation engines  
-5. Generate mutated testcases  
-6. Recompute dependent fields (e.g., length, checksum, CRC)  
+4. Compute dependent fields (e.g., length, checksum, CRC)   
+5. Initialize mutation engines
+6. Generate mutated testcases
 7. Send to device & receive response  
 8. Determine new response via Knowledge Base  
 9. Crash detection using windowed binary search  
@@ -169,27 +155,7 @@ CR-Fuzz internally performs the following steps:
 
 ---
 
-# 🧩 Protocol Plugins
-
-CR-Fuzz includes protocol-specific dependent-field logic.
-
-| Protocol | Plugin |
-|----------|--------|
-| MAVLink v2 | `MavlinkV2DependentPlugin` |
-| DJI DUML | `DumlDependentPlugin` |
-| BLE ATT | `BleAttDependentPlugin` |
-| Generic CRC/Length | `ExampleLengthCrcPlugin` |
-
-Usage example:
-
-```python
-plugin = MavlinkV2DependentPlugin(crc_extra_table=my_crc_table)
-plugin.register_all(dep_calc, pkt_len)
-```
-
----
-
-# 📊 Output Files
+# Output Files
 
 | Output | Description |
 |--------|-------------|
@@ -202,17 +168,10 @@ plugin.register_all(dep_calc, pkt_len)
 
 ---
 
-# 📑 Example Normal Packet Log
-
-```bash
-fd 01 0a 18 3f 00 12
-fd 01 0a 18 40 00 10
-```
-
----
-
-# ⚠️ Requirements
+# Requirements
 
 - Python ≥ 3.8  
 - For serial mode: `pyserial`  
-- UDP mode uses standard socket API  
+- UDP mode uses standard socket API
+- Real device is needed for wire/wireless communication and testing
+- Depending on the target device, the dependent field calculation algorithm may need to be added manually
