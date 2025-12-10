@@ -78,7 +78,7 @@ class FeedbackConfig:
     learning_rate: float = 1.0
     epsilon: float = 0.01
     m_min: int = 1
-    m_max_ratio: float = 0.5  # mutable 개수의 비율로 m_max를 정할 때 사용
+    m_max_ratio: float = 0.5  # Used when determining m_max as a ratio of the number of mutable elements
 
 
 @dataclass
@@ -94,8 +94,8 @@ class FuzzConfig:
     log_path: str = "./normal_packets.log"
     corpus_dir: str = "./corpus"
     stats_csv: str = "./fuzz_stats.csv"
-    dry_run: bool = False  # True면 실전 전송 대신 로컬 시뮬레이션(필요하면 구현)
-    save_interval: int = 1000  # N input마다 통계/seed 저장
+    dry_run: bool = False  # If True, local simulation instead of actual transmission (implementation if necessary)
+    save_interval: int = 1000  # Save statistics/seed for each N input
 
 logger = logging.getLogger("cr_fuzz")
 
@@ -165,7 +165,7 @@ class SerialDeviceInterface(DeviceInterface):
         liveness_normal_packet: Optional[bytes] = None,
     ):
         if serial is None:
-            raise RuntimeError("pyserial이 필요합니다. pip install pyserial 로 설치하세요.")
+            raise RuntimeError("You need pyserial. Install it with pip install pyserial .")
         self.port = port
         self.baudrate = baudrate
         self.read_timeout = read_timeout
@@ -379,7 +379,7 @@ def detect_log_parser_example(line: str) -> LogParser:
     if not line:
         return HexWithSpacesParser()
     if " " in line or "\t" in line:
-        # "AA BB" 스타일 혹은 Wireshark 스타일
+        # "AA BB" style or Wireshark style
         parts = line.split()
         if len(parts[0]) == 4 and parts[0].isdigit():
             return WiresharkStyleParser()
@@ -395,7 +395,7 @@ def load_normal_packets_from_log(
 ) -> List[Packet]:
     path = Path(log_path)
     if not path.is_file():
-        raise FileNotFoundError(f"로그 파일을 찾을 수 없습니다: {log_path}")
+        raise FileNotFoundError(f"Log file not found: {log_path}")
 
     packets: List[Packet] = []
 
@@ -403,7 +403,7 @@ def load_normal_packets_from_log(
         lines = f.readlines()
 
     if not lines:
-        raise ValueError("로그 파일이 비어 있습니다.")
+        raise ValueError("The log file is empty.")
 
     # parser auto-detect
     if parser is None:
@@ -421,20 +421,20 @@ def load_normal_packets_from_log(
             packets.append(pkt)
 
     if not packets:
-        raise ValueError(f"로그에서 유효한 패킷을 하나도 읽지 못했습니다: {log_path}")
+        raise ValueError(f"No valid packets were read from the log: {log_path}")
 
     length = len(packets[0])
     filtered = [p for p in packets if len(p) == length]
     dropped = len(packets) - len(filtered)
     if dropped > 0:
         logger.warning(
-            "%d개는 무시했습니다 (사용 길이=%d바이트).",
+            "%d ignored (length used = %d bytes).",
             dropped,
             length,
         )
     if not filtered:
         raise ValueError("Length Error")
-    logger.info("총 %d개의 정상 패킷 로드 (길이=%d바이트).", len(filtered), length)
+    logger.info("Total %d normal packets loaded (length=%d bytes).", len(filtered), length)
     return filtered
 
 class PacketSemanticInterpreter:
@@ -452,16 +452,16 @@ class PacketSemanticInterpreter:
 
     def classify_fields(self, packets: Sequence[Packet]) -> List[FieldInfo]:
         if not packets:
-            raise ValueError("PSI를 위해서는 최소 1개 이상의 패킷이 필요합니다.")
+            raise ValueError("At least one packet is required for PSI.")
 
         length = len(packets[0])
         for p in packets:
             if len(p) != length:
-                raise ValueError("모든 패킷의 길이는 동일해야 합니다.")
+                raise ValueError("All packets must be of the same length.")
 
         results: List[FieldInfo] = []
 
-        # 1단계: 빈도 기반
+        # 1단계: Frequency-based
         for i in range(length):
             unique_values = set(pkt[i] for pkt in packets)
             if len(unique_values) == 1:
@@ -475,7 +475,7 @@ class PacketSemanticInterpreter:
                 values = []
             results.append(FieldInfo(index=i, field_type=field_type, values=values))
 
-        self.logger.info("PSI 1단계 완료: 필드 개수=%d", len(results))
+        self.logger.info("PSI Step 1 Completed: Number of Fields = %d", len(results))
         cnt_fixed = sum(1 for f in results if f.field_type == FieldType.FIXED)
         cnt_spec = sum(1 for f in results if f.field_type == FieldType.SPECIFIC)
         cnt_mut = sum(1 for f in results if f.field_type == FieldType.MUTABLE)
@@ -483,7 +483,7 @@ class PacketSemanticInterpreter:
             "Fixed=%d, Specific=%d, Mutable=%d", cnt_fixed, cnt_spec, cnt_mut
         )
 
-        # 2단계: Dependent 판별
+        # 2단계: Dependent determination
         max_samples = min(self.cfg.test_mutable_samples, len(packets))
         for field in results:
             if field.field_type != FieldType.MUTABLE:
@@ -511,7 +511,7 @@ class PacketSemanticInterpreter:
         cnt_dep = sum(1 for f in results if f.field_type == FieldType.DEPENDENT)
         cnt_mut_after = sum(1 for f in results if f.field_type == FieldType.MUTABLE)
         self.logger.info(
-            "PSI 2단계 완료: Dependent=%d, Mutable(잔여)=%d",
+            "PSI Phase 2 Complete: Dependent=%d, Mutable(Remaining)=%d",
             cnt_dep,
             cnt_mut_after,
         )
@@ -561,7 +561,7 @@ class ExampleLengthCrcPlugin(DependentFieldPlugin):
 
 class ResponseKnowledgeBase:
     """
-    이전 응답을 저장하고 새 응답인지 판별.
+    Store previous responses and determine if they are new.
     """
 
     def __init__(self):
@@ -584,8 +584,8 @@ class ResponseNormalizer:
         zero_ranges: Optional[List[Tuple[int, int]]] = None,
     ):
         """
-        :param mask_ranges: (start, end) 범위만 살아남고 나머지는 0x00으로 마스킹
-        :param zero_ranges: (start, end) 범위는 0x00으로 덮어쓴다
+        :param mask_ranges: (start, end) Only the range survives, the rest is masked with 0x00
+        :param zero_ranges: (start, end) The range is overwritten with 0x00
         """
         self.mask_ranges = mask_ranges or []
         self.zero_ranges = zero_ranges or []
@@ -595,7 +595,7 @@ class ResponseNormalizer:
             return None
         b = bytearray(resp)
 
-        # zero_ranges 처리
+        # zero_ranges processing
         for s, e in self.zero_ranges:
             e = min(e, len(b))
             s = max(0, s)
@@ -615,7 +615,7 @@ class ResponseNormalizer:
 
 class NormalizedResponseKB:
     """
-    ResponseNormalizer와 결합한 Knowledge Base.
+    Knowledge Base combined with ResponseNormalizer.
     """
 
     def __init__(self, normalizer: ResponseNormalizer):
@@ -634,7 +634,7 @@ class NormalizedResponseKB:
 
 class FeedbackEngine:
     """
-    per-byte score 기반 adaptive mutation targeting.
+    Adaptive mutation targeting based on per-byte score.
     """
 
     def __init__(
@@ -654,7 +654,7 @@ class FeedbackEngine:
         total = sum(self.scores.get(i, 0.0) for i in self.mutable_indices)
         probs: Dict[int, float] = {}
         if total <= 0:
-            # 균등 분포
+            # uniform distribution
             v = 1.0 / len(self.mutable_indices)
             for idx in self.mutable_indices:
                 probs[idx] = v
@@ -693,7 +693,7 @@ class FeedbackEngine:
             chosen.append(selected)
             indices.remove(selected)
             probs.pop(selected, None)
-            # 재정규화
+            # Renormalization
             total = sum(probs.values())
             if total <= 0:
                 for idx in indices:
@@ -721,7 +721,7 @@ class MutationOperator(enum.Enum):
     XOR = "xor"
     RANDOM_OVERWRITE = "random_overwrite"
     BYTE_SWAP = "byte_swap"
-    SET_BOUNDARY = "set_boundary"  # 0x00, 0xFF, 0x7F, 0x80 등 경계값 세트
+    SET_BOUNDARY = "set_boundary"  # A set of boundary values ​​such as 0x00, 0xFF, 0x7F, 0x80, etc.
 
 
 @dataclass
@@ -738,7 +738,7 @@ class MutationStats:
 
 class MutationScheduler:
     """
-    여러 mutation operator에 대해 동적으로 weight를 조정.
+    Dynamically adjust weights for multiple mutation operators.
     """
 
     def __init__(self):
@@ -785,8 +785,7 @@ class MutationScheduler:
 
 class TestcaseGenerator:
     """
-    PSI 결과 + DependentFieldCalculator + FeedbackEngine + MutationScheduler
-    를 이용해 하나의 테스트케이스를 생성.
+    Create a test case using PSI results + DependentFieldCalculator + FeedbackEngine + MutationScheduler.
     """
 
     def __init__(
@@ -843,10 +842,10 @@ class TestcaseGenerator:
 
     def generate_from_seed(self, seed: Packet) -> Tuple[Packet, List[int], List[MutationOperator]]:
         pkt = seed.copy()
-        # Specific 필드 처리
+        # Specific field processing
         self._apply_specific_fields(pkt)
 
-        # Mutable 필드 처리
+        # Mutable field processing
         mutated_indices = self.feedback_engine.select_mutation_positions()
         used_ops: List[MutationOperator] = []
         for idx in mutated_indices:
@@ -854,7 +853,7 @@ class TestcaseGenerator:
             used_ops.append(op)
             self._mutate_byte(pkt, idx, op)
 
-        # Dependent 필드 재계산
+        # Dependent field recompution
         self.dep_calc.apply(pkt)
 
         return pkt, mutated_indices, used_ops
@@ -904,7 +903,7 @@ class CrashFilter:
                 lower = mid + 1
                 continue
             # 둘 다 crash가 아니면 false positive
-            self.logger.warning("CrashFilter: 재현 실패 (false positive 의심)")
+            self.logger.warning("CrashFilter: Reproducibility failed (false positive suspected)")
             return None
 
         return self.buffer[lower]
@@ -912,7 +911,7 @@ class CrashFilter:
 
 class LivenessChecker:
     """
-    CRFuzz.fuzz loop에 매 input마다 hook으로 넣을 수 있는 단순 liveness checker.
+    A simple liveness checker that can be hooked into every input in the CRFuzz.fuzz loop.
     """
 
     def __init__(
@@ -959,7 +958,7 @@ class SeedInfo:
 
 class SeedCorpusManager:
     """
-    seed corpus 관리: normal/log seed + interesting/new/crash seed 저장/로드.
+    seed corpus management: normal/log seed + interesting/new/crash seed store/load.
     """
 
     def __init__(self, corpus_dir: str):
@@ -984,7 +983,7 @@ class SeedCorpusManager:
         return Packet(info.data)
 
     def save_to_disk(self) -> None:
-        # 간단히: 각 seed를 파일로 저장 + 인덱스 csv 관리
+        # Simply: save each seed to a file + manage index csv
         index_file = self.corpus_dir / "index.csv"
         with index_file.open("w", newline="", encoding="utf-8") as csvfile:
             writer = csv.writer(csvfile)
@@ -1034,7 +1033,7 @@ class RunStats:
 
 class StatsLogger:
     """
-    주기적으로 RunStats와 Mutation/Feedback 상태를 CSV로 기록.
+    Periodically log RunStats and Mutation/Feedback status to CSV.
     """
 
     def __init__(self, csv_path: str):
@@ -1111,7 +1110,7 @@ class CRFuzz:
 
         self.logger = logging.getLogger("cr_fuzz.CRFuzz")
 
-        # seed corpus에 초기 normal seed 등록
+        # Registering initial normal seeds in the seed corpus
         for p in normal_packets:
             self.corpus_mgr.add_seed(p.to_bytes(), source="log", note="normal")
 
@@ -1150,12 +1149,12 @@ class CRFuzz:
         on_crash_found: Optional[Callable[[bytes, CrashResult], None]] = None,
     ) -> None:
         if not self.corpus_mgr.seeds:
-            raise RuntimeError("Seed corpus가 비어 있습니다.")
+            raise RuntimeError("Seed corpus is empty.")
 
         for i in range(1, iterations + 1):
             seed_pkt = self.corpus_mgr.random_seed()
             if seed_pkt is None:
-                raise RuntimeError("Seed corpus에서 seed를 가져오지 못했습니다.")
+                raise RuntimeError("Failed to retrieve seed from seed corpus.")
             testcase, mutated_indices, used_ops = self.testcase_gen.generate_from_seed(seed_pkt)
             data = testcase.to_bytes()
 
@@ -1168,7 +1167,7 @@ class CRFuzz:
                 self.stats.record_new_response()
                 self.feedback_engine.update_scores(mutated_indices, True)
                 self.scheduler.report_trial(used_ops, True)
-                # 새 응답을 seed로 승급
+                # Promote new response to seed
                 self.corpus_mgr.add_seed(data, source="new_response")
                 if on_new_response:
                     on_new_response(data, resp)
@@ -1188,7 +1187,7 @@ class CRFuzz:
                         if on_crash_found:
                             on_crash_found(crash_input, crash_res)
 
-            # 주기적으로 저장/통계 기록
+            # Periodically save/record statistics
             if save_interval > 0 and i % save_interval == 0:
                 self.logger.info(
                     "Iteration %d: inputs=%d, new_responses=%d, crashes=%d, ips=%.2f",
@@ -1214,7 +1213,7 @@ def build_device(
 ) -> DeviceInterface:
     if cfg.mode == "serial":
         if serial is None:
-            raise RuntimeError("pyserial이 설치되어 있지 않아 serial 모드를 사용할 수 없습니다.")
+            raise RuntimeError("Serial mode cannot be used because pyserial is not installed.")
         dev = SerialDeviceInterface(
             port=cfg.serial_port,
             baudrate=cfg.serial_baudrate,
@@ -1235,7 +1234,7 @@ def build_device(
         )
         return dev
     else:
-        raise ValueError(f"알 수 없는 device mode: {cfg.mode}")
+        raise ValueError(f"Unknown device mode: {cfg.mode}")
 
 
 def default_invalid_response(resp: Optional[bytes]) -> bool:
@@ -1258,19 +1257,19 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         description="CR-Fuzz extended Python implementation",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    p.add_argument("--log", dest="log_path", default="./normal_packets.log", help=".log 파일 경로")
-    p.add_argument("--mode", choices=["serial", "udp"], default="udp", help="장비 모드")
-    p.add_argument("--serial-port", default="COM3", help="시리얼 포트 이름")
-    p.add_argument("--baudrate", type=int, default=115200, help="시리얼 baudrate")
+    p.add_argument("--log", dest="log_path", default="./normal_packets.log", help=".log file path")
+    p.add_argument("--mode", choices=["serial", "udp"], default="udp", help="Device mode")
+    p.add_argument("--serial-port", default="COM3", help="Serial port name")
+    p.add_argument("--baudrate", type=int, default=115200, help="Serial baudrate")
     p.add_argument("--udp-ip", dest="udp_ip", default="127.0.0.1", help="UDP target IP")
     p.add_argument("--udp-port", dest="udp_port", type=int, default=14550, help="UDP target port")
-    p.add_argument("--iterations", type=int, default=100000, help="fuzzing input 개수")
-    p.add_argument("--save-interval", type=int, default=1000, help="seed/통계 저장 주기")
-    p.add_argument("--corpus-dir", default="./corpus", help="seed corpus 디렉터리")
-    p.add_argument("--stats-csv", default="./fuzz_stats.csv", help="통계 CSV 파일 경로")
-    p.add_argument("--log-level", default="INFO", help="로그 레벨 (DEBUG/INFO/WARN/ERROR)")
-    p.add_argument("--log-file", default=None, help="로그 파일 경로 (선택)")
-    p.add_argument("--dry-run", action="store_true", help="실제 전송 없이 구조만 테스트 (TODO)")
+    p.add_argument("--iterations", type=int, default=100000, help="fuzzing iteration")
+    p.add_argument("--save-interval", type=int, default=1000, help="seed/statistics save cycle")
+    p.add_argument("--corpus-dir", default="./corpus", help="seed corpus directory")
+    p.add_argument("--stats-csv", default="./fuzz_stats.csv", help="statistics CSV file path")
+    p.add_argument("--log-level", default="INFO", help="Log level (DEBUG/INFO/WARN/ERROR)")
+    p.add_argument("--log-file", default=None, help="Log file path")
+    p.add_argument("--dry-run", action="store_true", help="TODO")
     return p.parse_args(argv)
 
 
@@ -1279,7 +1278,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     log_cfg = LogConfig(log_level=args.log_level, log_file=args.log_file)
     log_cfg.init_logging()
 
-    logger.info("CR-Fuzz extended 시작")
+    logger.info("CR-Fuzz extended start")
 
     fuzz_cfg = FuzzConfig(
         iterations=args.iterations,
@@ -1298,18 +1297,18 @@ def main(argv: Optional[List[str]] = None) -> None:
         udp_target_port=args.udp_port,
     )
 
-    # 1) 정상 패킷 로딩
+    # 1) Normal packet loading
     normal_packets = load_normal_packets_from_log(fuzz_cfg.log_path)
     normal_packet_bytes = normal_packets[0].to_bytes()
 
-    # 2) Device 인터페이스
+    # 2) Device interface
     device = build_device(dev_cfg, normal_packet_bytes=normal_packet_bytes)
 
-    # 3) DependentFieldCalculator (예시 플러그인 사용)
+    # 3) DependentFieldCalculator
     pkt_len = len(normal_packets[0])
     dep_calc = build_example_dep_calc(pkt_len=pkt_len)
 
-    # 4) PSI/Feedback/Crash 설정
+    # 4) PSI/Feedback/Crash configuration
     psi_cfg = PSIConfig()
     fb_cfg = FeedbackConfig()
     crash_cfg = CrashConfig(
@@ -1318,9 +1317,9 @@ def main(argv: Optional[List[str]] = None) -> None:
         liveness_timeout=5.0,
     )
 
-    # 5) Response KB (노멀라이저 예시는 지금은 사용 안 하고 raw KB 사용)
+    # 5) Response KB
     resp_kb = ResponseKnowledgeBase()
-    # 필요한 경우:
+    # if necessary:
     # normalizer = ResponseNormalizer(mask_ranges=[(0, 16)], zero_ranges=[(4, 8)])
     # resp_kb = NormalizedResponseKB(normalizer)
 
@@ -1328,7 +1327,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     corpus_mgr = SeedCorpusManager(corpus_dir=fuzz_cfg.corpus_dir)
     stats_logger = StatsLogger(csv_path=fuzz_cfg.stats_csv)
 
-    # 7) CRFuzz 인스턴스
+    # 7) CRFuzz instance
     fuzzer = CRFuzz(
         device=device,
         normal_packets=normal_packets,
@@ -1350,7 +1349,7 @@ def main(argv: Optional[List[str]] = None) -> None:
         check_interval=crash_cfg.liveness_check_interval,
     )
 
-    # 9) 콜백 정의
+    # 9) callback definition
     def on_new_response(inp: bytes, resp: bytes) -> None:
         logger.info(
             "[NEW RESPONSE] input_len=%d, resp_len=%d",
@@ -1361,7 +1360,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     def on_crash(inp: bytes, crash_res: CrashResult) -> None:
         logger.error("[CRASH] reason=%s, input_len=%d", crash_res.reason, len(inp))
 
-    # 10) fuzz 시작
+    # 10) fuzzing start
     fuzzer.fuzz(
         iterations=fuzz_cfg.iterations,
         save_interval=fuzz_cfg.save_interval,
@@ -1371,7 +1370,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     )
 
     logger.info(
-        "CR-Fuzz 종료: total_inputs=%d, new_responses=%d, crashes=%d, ips=%.2f",
+        "CR-Fuzz end: total_inputs=%d, new_responses=%d, crashes=%d, ips=%.2f",
         fuzzer.stats.total_inputs,
         fuzzer.stats.new_responses,
         fuzzer.stats.crashes,
@@ -1383,7 +1382,7 @@ if __name__ == "__main__":
     main()
 	
 # ============================================================
-# 12. Simulation / Dry-Run Device (실제 장비 없이 테스트용)
+# 12. Simulation / Dry-Run Device
 # ============================================================
 
 class DummyCrashPattern(enum.Enum):
@@ -1396,14 +1395,14 @@ class DummyCrashPattern(enum.Enum):
 @dataclass
 class DummyDeviceScenario:
     """
-    DummyDeviceInterface에서 사용할 시나리오 정의.
+    Define scenarios to use in the DummyDeviceInterface.
 
-    - base_response: 기본 응답 패턴 (길이/값 상관 없음)
-    - noise_prob: 랜덤 노이즈를 섞을 확률
-    - new_response_prob: 완전히 새로운 응답을 만들어줄 확률
-    - crash_pattern: 크래시 패턴 (NONE/RANDOM/PERIODIC/THRESHOLD)
-    - crash_period: PERIODIC 일 때 몇 번째 입력마다 크래시 시뮬레이트할지
-    - crash_threshold: THRESHOLD 일 때, 입력 길이가 이 값 이상이면 크래시
+    - base_response: Default response pattern (any length or value)
+    - noise_prob: Probability of mixing random noise
+    - new_response_prob: Probability of generating a completely new response
+    - crash_pattern: Crash pattern (NONE/RANDOM/PERIODIC/THRESHOLD)
+    - crash_period: When periodic, how many inputs will cause a crash simulation
+    - crash_threshold: When THRESHOLD, a crash will occur if the input length exceeds this value
     """
 
     base_response: bytes = b"\x00\x01\x02\x03"
@@ -1416,10 +1415,10 @@ class DummyDeviceScenario:
 
 class DummyDeviceInterface(DeviceInterface):
     """
-    실제 장비 없이 CRFuzz 전체 파이프라인을 건조하게 테스트할 때 쓰는 더미 장치.
+    A dummy device used to dry-test the entire CRFuzz pipeline without actual equipment.
 
-    - send_and_receive: 입력에 따라 약간 변형된 응답을 반환
-    - send_sequence_and_check_crash: DummyCrashPattern에 맞춰 크래시 결과를 리턴
+    - send_and_receive: Returns a slightly modified response based on the input.    
+    - send_sequence_and_check_crash: Returns crash results according to the DummyCrashPattern.
     """
 
     def __init__(self, scenario: Optional[DummyDeviceScenario] = None):
@@ -1429,18 +1428,18 @@ class DummyDeviceInterface(DeviceInterface):
 
     def _generate_base_response(self, data: bytes) -> bytes:
         """
-        기본 응답 생성 로직.
-        - 입력 길이/일부 바이트를 섞어서 base_response와 합친다.
+        Basic response generation logic.
+        - Mix the input length/some bytes and merge them into base_response.
         """
         base = bytearray(self.scenario.base_response)
         if not data:
             return bytes(base)
 
-        # 입력의 앞 4바이트와 base_response를 XOR
+        # XOR the first 4 bytes of input with base_response
         for i in range(min(4, len(base), len(data))):
             base[i] ^= data[i]
 
-        # 길이 정보 살짝 추가
+        # Add a little length information
         if len(base) < 6:
             base.extend(b"\x00" * (6 - len(base)))
         base[4] = len(data) & 0xFF
@@ -1450,12 +1449,12 @@ class DummyDeviceInterface(DeviceInterface):
 
     def _add_noise(self, resp: bytes) -> bytes:
         """
-        noise_prob에 따라 응답을 살짝 깨트린다.
+        Slightly break up the response according to noise_prob.
         """
         if random.random() > self.scenario.noise_prob:
             return resp
         b = bytearray(resp)
-        # 랜덤 위치 한 두 곳 noise
+        # One or two random locations noise
         for _ in range(random.randint(1, 2)):
             idx = random.randint(0, len(b) - 1)
             b[idx] ^= random.randint(1, 255)
@@ -1463,7 +1462,7 @@ class DummyDeviceInterface(DeviceInterface):
 
     def _maybe_new_response(self, resp: bytes) -> bytes:
         """
-        일정 확률로 완전히 랜덤한 새 응답을 생성한다.
+        Generates a completely random new response with a certain probability.
         """
         if random.random() > self.scenario.new_response_prob:
             return resp
@@ -1472,7 +1471,7 @@ class DummyDeviceInterface(DeviceInterface):
 
     def send_and_receive(self, data: bytes) -> Optional[bytes]:
         self.counter += 1
-        # 아주 낮은 확률로 "응답 없음"도 시뮬레이트
+        # Simulates "no response" with very low probability
         if random.random() < 0.01:
             return None
         resp = self._generate_base_response(data)
@@ -1482,10 +1481,10 @@ class DummyDeviceInterface(DeviceInterface):
 
     def send_sequence_and_check_crash(self, seq: Iterable[bytes]) -> CrashResult:
         """
-        DummyCrashPattern에 따라 크래시 여부를 판단.
-        - RANDOM: 일정 확률로 크래시
-        - PERIODIC: N개 전송 후마다 크래시
-        - THRESHOLD: 입력 중 길이가 threshold 이상인게 있으면 크래시
+        Crash detection based on the DummyCrashPattern.
+        - RANDOM: Crash with a certain probability.
+        - PERIODIC: Crash after every N transmissions.
+        - THRESHOLD: Crash if any input exceeds the threshold length.
         """
         crashed = False
         reason = ""
@@ -1496,14 +1495,14 @@ class DummyDeviceInterface(DeviceInterface):
 
         if self.scenario.crash_pattern == DummyCrashPattern.RANDOM:
             for d in seq:
-                if random.random() < 0.0005:  # 매우 낮은 확률
+                if random.random() < 0.0005:  # Very low probability
                     crashed = True
                     reason = "dummy_random"
                     detail = {"input_len": len(d)}
                     break
 
         elif self.scenario.crash_pattern == DummyCrashPattern.PERIODIC:
-            # seq 길이만큼 counter 증가
+            # Increment counter by the length of seq
             for d in seq:
                 self.counter += 1
             if self.counter % self.scenario.crash_period == 0:
@@ -1532,7 +1531,7 @@ class FuzzCampaignConfig:
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> "FuzzCampaignConfig":
         """
-        dict 구조 예시:
+        dict structure example:
 
         {
           "device": {
@@ -1723,7 +1722,7 @@ class ReplayEngine:
         crash_detector: Optional[Callable[[], bool]] = None,
     ) -> CrashResult:
         if crash_detector is None:
-            # DeviceInterface의 시퀀스 체크 사용
+            # Using sequence check in DeviceInterface
             return self.device.send_sequence_and_check_crash(inputs)
 
         crashed = False
@@ -1803,17 +1802,17 @@ class FuzzReportGenerator:
     def _section_summary(self) -> str:
         s = self.stats.summary_dict()
         lines = [
-            f"총 입력 수: {s['total_inputs']}",
-            f"새 응답 수: {s['new_responses']}",
-            f"크래시 수: {s['crashes']}",
-            f"총 수행 시간(초): {s['elapsed_sec']:.2f}",
-            f"초당 입력 수(IPS): {s['inputs_per_sec']:.2f}",
+            f"Total input: {s['total_inputs']}",
+            f"New response: {s['new_responses']}",
+            f"Crashes: {s['crashes']}",
+            f"Total execution time (seconds): {s['elapsed_sec']:.2f}",
+            f"Inputs per sec(IPS): {s['inputs_per_sec']:.2f}",
         ]
         return "\n".join(lines)
 
     def _section_mutation(self) -> str:
         snap = self.scheduler.get_stats_snapshot()
-        lines = ["Mutation Operator 통계:"]
+        lines = ["Mutation Operator statistics:"]
         for op, st in snap.items():
             lines.append(
                 f"- {op}: tried={st['tried']}, success={st['success']}, "
@@ -1825,14 +1824,14 @@ class FuzzReportGenerator:
         snap = self.feedback.get_scores_snapshot()
         top_n = 20
         sorted_items = sorted(snap.items(), key=lambda kv: kv[1], reverse=True)
-        lines = [f"Feedback score 상위 {top_n}개 바이트:"]
+        lines = [f"Top {top_n} bytes of feedback score:"]
         for idx, score in sorted_items[:top_n]:
             lines.append(f"- index {idx}: score={score:.2f}")
         return "\n".join(lines)
 
     def _section_corpus(self) -> str:
         lines = [
-            "Seed corpus 정보:",
+            "Seed corpus:",
             f"- 총 seed 개수: {len(self.corpus.seeds)}",
         ]
         by_source: Dict[str, int] = {}
@@ -1844,9 +1843,9 @@ class FuzzReportGenerator:
 
     def _section_responses(self) -> str:
         if not self.recorder:
-            return "ResponseRecorder가 제공되지 않았습니다."
+            return "ResponseRecorder was not provided."
         lines = [
-            f"ResponseRecorder에 저장된 레코드 수: {len(self.recorder.records)}",
+            f"Number of records stored in ResponseRecorder: {len(self.recorder.records)}",
             "예시 5개:",
         ]
         for rec in self.recorder.records[:5]:
@@ -1859,11 +1858,11 @@ class FuzzReportGenerator:
 
     def build_report(self, fmt: ReportFormat = ReportFormat.MARKDOWN) -> str:
         builder = ReportBuilder(title="CR-Fuzz Fuzzing Report")
-        builder.add_section("요약", self._section_summary())
-        builder.add_section("Mutation 통계", self._section_mutation())
-        builder.add_section("Feedback 분포", self._section_feedback())
+        builder.add_section("Summary", self._section_summary())
+        builder.add_section("Mutation statistics", self._section_mutation())
+        builder.add_section("Feedback distribution", self._section_feedback())
         builder.add_section("Seed Corpus", self._section_corpus())
-        builder.add_section("응답 정보", self._section_responses())
+        builder.add_section("Response information", self._section_responses())
 
         if fmt == ReportFormat.MARKDOWN:
             return builder.build_markdown()
@@ -1883,7 +1882,7 @@ class MavlinkV2DependentPlugin(DependentFieldPlugin):
 
     def __init__(self, crc_extra_table: Optional[Dict[int, int]] = None):
         """
-        :param crc_extra_table: msgid(int) -> crc_extra(int) 매핑
+        :param crc_extra_table: msgid(int) -> crc_extra(int) mapping
         """
         self.crc_extra_table = crc_extra_table or {}
         self.logger = logging.getLogger("cr_fuzz.MavlinkV2Plugin")
@@ -2011,7 +2010,7 @@ class BleAttDependentPlugin(DependentFieldPlugin):
 
     def register_all(self, calc: DependentFieldCalculator, pkt_len: int) -> None:
         def _len_func(pkt: Packet) -> int:
-            # 예: 전체 길이 - header_size
+            # ex: total_length - header_size
             l = len(pkt) - self.header_size
             if l < 0:
                 l = 0
@@ -2170,32 +2169,32 @@ def parse_extended_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         description="CR-Fuzz extended CLI (scenario-based)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    p.add_argument("--scenario-name", default="default_scenario", help="시나리오 이름")
-    p.add_argument("--campaign-json", default=None, help="FuzzCampaignConfig JSON 파일")
+    p.add_argument("--scenario-name", default="default_scenario", help="Scenario name")
+    p.add_argument("--campaign-json", default=None, help="FuzzCampaignConfig JSON file")
     p.add_argument("--protocol", choices=["none", "mavlink", "duml", "ble"], default="none")
-    p.add_argument("--dummy-device", action="store_true", help="실제 장비 대신 DummyDevice 사용")
+    p.add_argument("--dummy-device", action="store_true", help="DummyDevice")
     p.add_argument("--dummy-crash", choices=["none", "random", "periodic", "threshold"], default="none")
     p.add_argument("--dummy-crash-period", type=int, default=5000)
     p.add_argument("--dummy-crash-threshold", type=int, default=128)
-    p.add_argument("--report", default=None, help="리포트 출력 파일 경로 (선택)")
+    p.add_argument("--report", default=None, help="report file path")
     p.add_argument(
         "--report-format",
         choices=["md", "markdown", "html"],
         default="md",
-        help="리포트 포맷",
+        help="report format",
     )
-    p.add_argument("--log", dest="log_path", default="./normal_packets.log", help=".log 파일 경로")
-    p.add_argument("--mode", choices=["serial", "udp"], default="udp", help="장비 모드")
-    p.add_argument("--serial-port", default="COM3", help="시리얼 포트 이름")
-    p.add_argument("--baudrate", type=int, default=115200, help="시리얼 baudrate")
+    p.add_argument("--log", dest="log_path", default="./normal_packets.log", help=".log file path")
+    p.add_argument("--mode", choices=["serial", "udp"], default="udp", help="Device mode")
+    p.add_argument("--serial-port", default="COM3", help="Serial port name")
+    p.add_argument("--baudrate", type=int, default=115200, help="Serial baudrate")
     p.add_argument("--udp-ip", dest="udp_ip", default="127.0.0.1", help="UDP target IP")
     p.add_argument("--udp-port", dest="udp_port", type=int, default=14550, help="UDP target port")
-    p.add_argument("--iterations", type=int, default=100000, help="fuzzing input 개수")
-    p.add_argument("--save-interval", type=int, default=1000, help="seed/통계 저장 주기")
-    p.add_argument("--corpus-dir", default="./corpus", help="seed corpus 디렉터리")
-    p.add_argument("--stats-csv", default="./fuzz_stats_ext.csv", help="통계 CSV 파일 경로")
-    p.add_argument("--log-level", default="INFO", help="로그 레벨 (DEBUG/INFO/WARN/ERROR)")
-    p.add_argument("--log-file", default=None, help="로그 파일 경로 (선택)")
+    p.add_argument("--iterations", type=int, default=100000, help="fuzzing iteration")
+    p.add_argument("--save-interval", type=int, default=1000, help="seed/statistics save cycle")
+    p.add_argument("--corpus-dir", default="./corpus", help="seed corpus directory")
+    p.add_argument("--stats-csv", default="./fuzz_stats_ext.csv", help="CSV file path")
+    p.add_argument("--log-level", default="INFO", help="Log level (DEBUG/INFO/WARN/ERROR)")
+    p.add_argument("--log-file", default=None, help="Log file path")
     return p.parse_args(argv)
 
 
@@ -2205,7 +2204,7 @@ def extended_main(argv: Optional[List[str]] = None) -> None:
     log_cfg = LogConfig(log_level=args.log_level, log_file=args.log_file)
     log_cfg.init_logging()
     logger = logging.getLogger("cr_fuzz.ext_main")
-    logger.info("CR-Fuzz extended scenario-based main 시작")
+    logger.info("CR-Fuzz extended scenario-based main start")
 
     if args.campaign_json:
         campaign_cfg = FuzzCampaignConfig.from_json_file(args.campaign_json)
@@ -2270,5 +2269,5 @@ def extended_main(argv: Optional[List[str]] = None) -> None:
         report_format=fmt,
     )
 
-    logger.info("CR-Fuzz extended scenario-based main 종료")
+    logger.info("CR-Fuzz extended scenario-based main end")
 
