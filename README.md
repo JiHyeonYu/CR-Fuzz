@@ -16,6 +16,7 @@ This implementation includes:
 ✓ Dummy device for simulation without real hardware
 
 Installation
+```bash
 git clone https://github.com/your/repo.git
 cd repo
 pip install -r requirements.txt
