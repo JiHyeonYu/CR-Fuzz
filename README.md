@@ -4,10 +4,15 @@ CR-Fuzz is a feedback-driven fuzzing framework designed for robotic vehicles, dr
 This implementation includes:
 
 ✓ Packet Semantic Interpretation (PSI): Fixed / Specific / Mutable / Dependent field classification
+
 ✓ Adaptive byte-level mutation targeting (Feedback Engine)
+
 ✓ Dynamic operator scheduling (Mutation Scheduler)
+
 ✓ Crash detection via windowed binary search (CrashFilter)
+
 ✓ UDP and Serial device interfaces
+
 ✓ Dummy device for simulation without real hardware
 
 Installation
