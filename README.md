@@ -3,12 +3,18 @@ CR-Fuzz is a feedback-driven fuzzing framework designed for robotic vehicles, dr
 
 This implementation includes:
 
-✓ Packet Semantic Interpretation (PSI): Fixed / Specific / Mutable / Dependent field classification  
-✓ Adaptive byte-level mutation targeting (Feedback Engine)  
-✓ Dynamic operator scheduling (Mutation Scheduler)  
-✓ Dependent-field recomputation (length, CRC, checksums, etc.)  
-✓ Crash detection via windowed binary search (CrashFilter)  
-✓ UDP and Serial device interfaces  
+✓ Packet Semantic Interpretation (PSI): Fixed / Specific / Mutable / Dependent field classification
+
+✓ Adaptive byte-level mutation targeting (Feedback Engine)
+
+✓ Dynamic operator scheduling (Mutation Scheduler)
+
+✓ Dependent-field recomputation (length, CRC, checksums, etc.)
+
+✓ Crash detection via windowed binary search (CrashFilter)
+
+✓ UDP and Serial device interfaces
+
 ---
 
 # Installation
@@ -113,7 +119,7 @@ python CR_Fuzz.py \
 ## 2. Fuzzing via Serial Port
 
 ```bash
-python cr_fuzz2.py \
+python CR_Fuzz.py \
   --mode serial \
   --serial-port COM3 \
   --baudrate 1500000 \
