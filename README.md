@@ -17,7 +17,7 @@ This implementation includes:
 
 ---
 
-# Installation
+# 📦 Installation
 
 ```bash
 git clone https://github.com/JiHyeonYu/CR-Fuzz.git
@@ -33,7 +33,7 @@ pip install pyserial
 
 ---
 
-# Normal Packet Log (Required)
+# 📑 Normal Packet Log (Required)
 
 CR-Fuzz requires a log file containing normal, valid packets.  
 This baseline is used for PSI analysis and seed corpus initialization.
@@ -54,7 +54,7 @@ Supported formats:
 
 ---
 
-# CLI Parameters
+# 🔧 CLI Parameters
 
 Run:
 
@@ -100,7 +100,7 @@ python CR-Fuzz.py --help
 
 ---
 
-# Usage Examples
+# ▶️ Usage Examples
 
 ## 1. Fuzzing via UDP
 
@@ -139,7 +139,7 @@ from CR_fuzz.py import DummyDeviceInterface, DummyDeviceScenario
 
 ---
 
-# Architecture
+# 🧠 Architecture
 
 CR-Fuzz internally performs the following steps:
 
@@ -161,7 +161,7 @@ CR-Fuzz internally performs the following steps:
 
 ---
 
-# Output Files
+# 📊 Output Files
 
 | Output | Description |
 |--------|-------------|
@@ -174,7 +174,7 @@ CR-Fuzz internally performs the following steps:
 
 ---
 
-# Requirements
+# ⚠️ Requirements
 
 - Python ≥ 3.8  
 - For serial mode: `pyserial`  
