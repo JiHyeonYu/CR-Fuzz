@@ -1,4 +1,4 @@
-## Confirmed Issues Corresponding to Previously Reported Issues
+## Previously Reported Issues Detected by CR-Fuzz
 
 The following table summarizes devices for which CR-Fuzz discovered crashes
 that correspond to previously reported vulnerabilities or public issues.
