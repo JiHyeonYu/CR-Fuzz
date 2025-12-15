@@ -387,7 +387,7 @@ def detect_log_parser_example(line: str) -> LogParser:
             return WiresharkStyleParser()
         return HexWithSpacesParser()
     else:
-        # 공백 없이 raw hex
+        # raw hex
         return RawHexParser()
 
 """
@@ -454,7 +454,7 @@ def load_normal_packets_from_log_grouped(
     if not lines:
         raise ValueError("The log file is empty.")
 
-    # parser auto-detect (기존 로직 유지)
+    
     if parser is None:
         for line in lines:
             if line.strip() and not line.lstrip().startswith(("#", "//")):
@@ -679,7 +679,7 @@ class ResponsePSI:
             length, cnt_fixed, cnt_spec, cnt_mut
         )
         return results
-"""
+
 
 class ResponseNormalizer:
     
@@ -1007,7 +1007,7 @@ class CrashFilter:
             if res_b.crashed:
                 lower = mid + 1
                 continue
-            # 둘 다 crash가 아니면 false positive
+            # false positive
             self.logger.warning("CrashFilter: Reproducibility failed (false positive suspected)")
             return None
 
@@ -2393,5 +2393,6 @@ def extended_main(argv: Optional[List[str]] = None) -> None:
     )
 
     logger.info("CR-Fuzz extended scenario-based main end")
+
 
 
