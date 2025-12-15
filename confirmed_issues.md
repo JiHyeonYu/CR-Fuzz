@@ -1,15 +1,15 @@
-## Confirmed Issues Corresponding to Previously Reported issues
+## Confirmed Issues Corresponding to Previously Reported Issues
 
 The following table summarizes devices for which CR-Fuzz discovered crashes
 that correspond to previously reported vulnerabilities or public issues.
 Since CR-Fuzz operates in a black-box setting, the correspondence is
 established based on similarities in externally observable symptoms,
 triggering input characteristics, and testing setup conditions such as
-device model, firmware lineage, and communication protocol, etc.
+device model, firmware lineage, and communication protocol, and related factors.
 
 | Crash ID | Target Device | Public Identifier / Reference |
 |----------|---------------|-------------------------------|
-| #3 | Segway Ninebot Mini Pro | [Report](https://www.ioactive.com/wp-content/uploads/pdfs/IOActive-Security-Advisory-Ninebot-Segway-miniPRO_Final.pdf) |
+| #3 | Segway Ninebot Mini Pro | [Vulnerability Report](https://www.ioactive.com/wp-content/uploads/pdfs/IOActive-Security-Advisory-Ninebot-Segway-miniPRO_Final.pdf) |
 | #4 | DJI Mavic Air 2 | [Research Paper](https://www.ndss-symposium.org/wp-content/uploads/2023/02/ndss2023_f217_paper.pdf) |
 | #7 | DJI Mavic 3 | CVE-2023-6948 |
 | #8 | DJI Mavic 3 | CVE-2023-51452 |
