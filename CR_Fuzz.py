@@ -13,9 +13,11 @@ import time
 import csv
 from dataclasses import dataclass, field
 from pathlib import Path
+from collections import defaultdict
 from typing import (
     Callable,
     Dict,
+	DefaultDict,
     Iterable,
     List,
     Optional,
@@ -388,7 +390,7 @@ def detect_log_parser_example(line: str) -> LogParser:
         # 공백 없이 raw hex
         return RawHexParser()
 
-
+"""
 def load_normal_packets_from_log(
     log_path: str,
     parser: Optional[LogParser] = None,
@@ -436,6 +438,47 @@ def load_normal_packets_from_log(
         raise ValueError("Length Error")
     logger.info("Total %d normal packets loaded (length=%d bytes).", len(filtered), length)
     return filtered
+"""
+
+def load_normal_packets_from_log_grouped(
+    log_path: str,
+    parser: Optional[LogParser] = None,
+) -> Dict[int, List[Packet]]:
+    path = Path(log_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Log file not found: {log_path}")
+
+    with path.open("r", encoding="utf-8", errors="ignore") as f:
+        lines = f.readlines()
+
+    if not lines:
+        raise ValueError("The log file is empty.")
+
+    # parser auto-detect (기존 로직 유지)
+    if parser is None:
+        for line in lines:
+            if line.strip() and not line.lstrip().startswith(("#", "//")):
+                parser = detect_log_parser_example(line)
+                logger.info("Auto-detected log parser: %s", parser.__class__.__name__)
+                break
+        if parser is None:
+            parser = HexWithSpacesParser()
+
+    by_len: DefaultDict[int, List[Packet]] = defaultdict(list)
+    for line in lines:
+        pkt = parser.parse_line(line)
+        if pkt is None:
+            continue
+        by_len[len(pkt)].append(pkt)
+
+    if not by_len:
+        raise ValueError(f"No valid packets were read from the log: {log_path}")
+
+    for L, ps in sorted(by_len.items()):
+        logger.info("Loaded normal packets: len=%d count=%d", L, len(ps))
+    return dict(by_len)
+
+
 
 class PacketSemanticInterpreter:
 
@@ -559,10 +602,7 @@ class ExampleLengthCrcPlugin(DependentFieldPlugin):
         calc.register_calculator(pkt_len - 1, self.calc_crc)
 
 
-class ResponseKnowledgeBase:
-    """
-    Store previous responses and determine if they are new.
-    """
+"""class ResponseKnowledgeBase:
 
     def __init__(self):
         self._seen: set[bytes] = set()
@@ -574,7 +614,72 @@ class ResponseKnowledgeBase:
             self._seen.add(resp)
             return True
         return False
+"""
 
+class ResponseKnowledgeBase:
+    def __init__(self):
+        self._seen: Dict[int, set[bytes]] = {}
+        self._compare_offsets_by_len: Dict[int, Tuple[int, ...]] = {}
+
+    def update_from_psi(self, resp_len: int, fields: List[FieldInfo]) -> None:
+        
+        offsets = [f.index for f in fields if f.field_type in (FieldType.SPECIFIC, FieldType.MUTABLE)]
+        self._compare_offsets_by_len[resp_len] = tuple(sorted(set(offsets)))
+        if resp_len not in self._seen:
+            self._seen[resp_len] = set()
+
+    def _signature(self, resp: bytes) -> bytes:
+        L = len(resp)
+        offs = self._compare_offsets_by_len.get(L)
+        if not offs:
+            return resp
+        return bytes(resp[i] for i in offs if i < L)
+
+    def is_new(self, resp: Optional[bytes]) -> bool:
+        if resp is None:
+            return False
+        L = len(resp)
+        if L not in self._seen:
+            self._seen[L] = set()
+        sig = self._signature(resp)
+        if sig in self._seen[L]:
+            return False
+        self._seen[L].add(sig)
+        return True
+
+
+class ResponsePSI:
+    def __init__(self, cfg: PSIConfig):
+        self.cfg = cfg
+        self.logger = logging.getLogger("cr_fuzz.ResponsePSI")
+
+    def classify_frequency_only(self, responses: Sequence[bytes]) -> List[FieldInfo]:
+        if not responses:
+            raise ValueError("At least one response is required.")
+        length = len(responses[0])
+        for r in responses:
+            if len(r) != length:
+                raise ValueError("All responses must be of the same length.")
+
+        results: List[FieldInfo] = []
+        for i in range(length):
+            uniq = set(r[i] for r in responses)
+            if len(uniq) == 1:
+                results.append(FieldInfo(i, FieldType.FIXED, list(uniq)))
+            elif 1 < len(uniq) <= self.cfg.threshold_specific:
+                results.append(FieldInfo(i, FieldType.SPECIFIC, sorted(uniq)))
+            else:
+                results.append(FieldInfo(i, FieldType.MUTABLE, []))
+
+        cnt_fixed = sum(1 for f in results if f.field_type == FieldType.FIXED)
+        cnt_spec  = sum(1 for f in results if f.field_type == FieldType.SPECIFIC)
+        cnt_mut   = sum(1 for f in results if f.field_type == FieldType.MUTABLE)
+        self.logger.info(
+            "Response PSI (freq-only): len=%d fixed=%d specific=%d mutable=%d",
+            length, cnt_fixed, cnt_spec, cnt_mut
+        )
+        return results
+"""
 
 class ResponseNormalizer:
     
@@ -1298,8 +1403,10 @@ def main(argv: Optional[List[str]] = None) -> None:
     )
 
     # 1) Normal packet loading
-    normal_packets = load_normal_packets_from_log(fuzz_cfg.log_path)
-    normal_packet_bytes = normal_packets[0].to_bytes()
+    normal_by_len = load_normal_packets_from_log_grouped(fuzz_cfg.log_path)
+    pkt_len = max(normal_by_len.keys(), key=lambda L: len(normal_by_len[L]))
+	normal_packets = normal_by_len[pkt_len]
+	normal_packet_bytes = normal_packets[0].to_bytes()
 
     # 2) Device interface
     device = build_device(dev_cfg, normal_packet_bytes=normal_packet_bytes)
@@ -1319,6 +1426,22 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     # 5) Response KB
     resp_kb = ResponseKnowledgeBase()
+    resp_psi = ResponsePSI(psi_cfg)
+
+	resp_samples_by_len: Dict[int, List[bytes]] = {}
+
+	for p in normal_packets:
+    	resp = device.send_and_receive(p.to_bytes())
+    	if resp is None:
+        	continue
+    	resp_samples_by_len.setdefault(len(resp), []).append(resp)
+
+
+	for rlen, rs in resp_samples_by_len.items():
+    	if len(rs) < 2:
+        	continue
+    	fields = resp_psi.classify_frequency_only(rs)
+   		resp_kb.update_from_psi(rlen, fields)
     # if necessary:
     # normalizer = ResponseNormalizer(mask_ranges=[(0, 16)], zero_ranges=[(4, 8)])
     # resp_kb = NormalizedResponseKB(normalizer)
@@ -2270,4 +2393,5 @@ def extended_main(argv: Optional[List[str]] = None) -> None:
     )
 
     logger.info("CR-Fuzz extended scenario-based main end")
+
 
