@@ -9,7 +9,7 @@ device model, firmware lineage, and communication protocol, etc.
 
 | Crash ID | Target Device | Public Identifier / Reference |
 |----------|---------------|-------------------------------|
-| #3 | Segway Ninebot Mini Pro | [Report](https://www.ioactive.com/wp-content/uploads/pdfs/IOActive-Security-Advisory-Ninebot-Segway-miniPRO_Final.pdf |
+| #3 | Segway Ninebot Mini Pro | [Report](https://www.ioactive.com/wp-content/uploads/pdfs/IOActive-Security-Advisory-Ninebot-Segway-miniPRO_Final.pdf) |
 | #4 | DJI Mavic Air 2 | [Research Paper](https://www.ndss-symposium.org/wp-content/uploads/2023/02/ndss2023_f217_paper.pdf) |
 | #7 | DJI Mavic 3 | CVE-2023-6948 |
 | #8 | DJI Mavic 3 | CVE-2023-51452 |
