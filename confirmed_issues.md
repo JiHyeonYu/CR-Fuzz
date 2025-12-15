@@ -4,7 +4,7 @@ The following table summarizes devices for which CR-Fuzz discovered crashes
 that correspond to previously reported vulnerabilities or public issues.
 The correspondence is established based on similarities in externally observable symptoms,
 triggering input characteristics, and testing setup conditions such as
-device model, firmware lineage, and communication protocol, and related factors.
+device model, firmware lineage, communication protocol, and related factors.
 
 | Crash ID | Target Device | Public Identifier / Reference |
 |----------|---------------|-------------------------------|
