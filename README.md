@@ -177,5 +177,6 @@ CR-Fuzz internally performs the following steps:
 - Python ≥ 3.8  
 - For serial mode: `pyserial`  
 - UDP mode uses standard socket API
+- A collection of normal logs for the target
 - Real device is needed for wire/wireless communication and testing
 - Depending on the target device, the dependent field calculation algorithm may need to be added manually
