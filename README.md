@@ -131,8 +131,6 @@ python CR_Fuzz.py \
 
 ## 3. Using the Dummy Device Simulator
 
-The framework includes a full-featured dummy device with adjustable crash patterns, noise injection, and new-response simulation.
-
 ```python
 from CR_fuzz.py import DummyDeviceInterface, DummyDeviceScenario
 ```
