@@ -7,7 +7,7 @@ triggering input characteristics, and testing setup conditions such as
 device model, firmware lineage, communication protocol, and related factors.
 
 | Target Device | Crash ID | Public Identifier / Reference |
-|:-------------:|:--------:|:-----------------------------:|
+|:-------------:|:--------:|-----------------------------|
 | 3DR Solo | #9  | CVE-2024-38951 |
 | 3DR Solo | #10 | [GitHub Issue](https://github.com/PX4/PX4-Autopilot/issues/18385) |
 | 3DR Solo | #11 | [GitHub Issue](https://github.com/PX4/PX4-Autopilot/issues/18651) |
